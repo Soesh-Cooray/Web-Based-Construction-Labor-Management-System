@@ -1,47 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../common/Modal';
 import { useLabor } from '../../context/LaborContext';
-import { DollarSign, CreditCard, AlertCircle, CheckCircle, FileText } from 'lucide-react';
+import { DollarSign, AlertCircle } from 'lucide-react';
 
-const RecordPaymentModal = ({ isOpen, onClose, laborer, onSuccessPayment }) => {
-  const { laborers, recordPayment, getCalculatedWages } = useLabor();
-
-  const [selectedLaborerId, setSelectedLaborerId] = useState('');
-  const [form, setForm] = useState({
-    amount: '',
+const RecordPaymentForm = ({
+  selectedLaborerId,
+  currentLaborerWage,
+  onClose,
+  recordPayment,
+  onSuccessPayment
+}) => {
+  const [form, setForm] = useState(() => ({
+    amount: currentLaborerWage && currentLaborerWage.balanceDue > 0 ? currentLaborerWage.balanceDue.toFixed(2) : '0.00',
     date: new Date().toISOString().split('T')[0],
     method: 'Bank Transfer',
-    reference: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+    reference: `TXN-${Date.now().toString().slice(-6)}`,
     approvedBy: 'Eng. Nihal Samarasinghe (Chief Supervisor)',
     notes: 'Bi-weekly payroll settlement'
-  });
+  }));
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-
-  useEffect(() => {
-    if (laborer) {
-      setSelectedLaborerId(laborer.id);
-    } else if (laborers.length > 0 && !selectedLaborerId) {
-      setSelectedLaborerId(laborers[0].id);
-    }
-  }, [laborer, laborers]);
-
-  // Calculate current wages and due balance for selected laborer
-  const calculatedWages = getCalculatedWages();
-  const currentLaborerWage = calculatedWages.find((w) => w.laborer.id === selectedLaborerId);
-
-  // When selected laborer changes, suggest the outstanding balance
-  useEffect(() => {
-    if (currentLaborerWage && (!form.amount || parseFloat(form.amount) === 0)) {
-      setForm((prev) => ({
-        ...prev,
-        amount: currentLaborerWage.balanceDue > 0 ? currentLaborerWage.balanceDue.toFixed(2) : '0.00'
-      }));
-    }
-  }, [selectedLaborerId]);
-
-  if (!isOpen) return null;
 
   const validateField = (field, value) => {
     let err = '';
@@ -122,12 +101,155 @@ const RecordPaymentModal = ({ isOpen, onClose, laborer, onSuccessPayment }) => {
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Record Finalized Labor Payment"
-      maxWidth="680px"
-    >
+    <form onSubmit={handleSubmit} noValidate>
+      <div className="form-row">
+        <div className="form-group">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label className="form-label" htmlFor="pay-amount">
+              Payment Amount (Rs. LKR) <span className="required">*</span>
+            </label>
+            {currentLaborerWage && currentLaborerWage.balanceDue > 0 && (
+              <button
+                type="button"
+                onClick={handleSetFullBalance}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--amber-primary)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Pay Full Balance (Rs. {currentLaborerWage.balanceDue.toFixed(2)})
+              </button>
+            )}
+          </div>
+          <input
+            id="pay-amount"
+            type="number"
+            step="1.00"
+            min="1.00"
+            name="amount"
+            placeholder="0.00"
+            value={form.amount}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`form-control ${touched.amount && errors.amount ? 'is-invalid' : ''}`}
+            required
+          />
+          {touched.amount && errors.amount && (
+            <span className="form-error-msg"><AlertCircle size={13} /> {errors.amount}</span>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="pay-date">
+            Disbursement Date <span className="required">*</span>
+          </label>
+          <input
+            id="pay-date"
+            type="date"
+            name="date"
+            value={form.date}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`form-control ${touched.date && errors.date ? 'is-invalid' : ''}`}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label" htmlFor="pay-method">Payment Method</label>
+          <select
+            id="pay-method"
+            name="method"
+            value={form.method}
+            onChange={handleChange}
+            className="form-control"
+          >
+            <option value="Bank Transfer">Bank Wire Transfer</option>
+            <option value="Cash">Cash Payroll Disbursement</option>
+            <option value="Cheque">Bank Cheque</option>
+            <option value="Digital Wallet">Mobile / Digital Wallet</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="pay-ref">
+            Transaction / Cheque Ref <span className="required">*</span>
+          </label>
+          <input
+            id="pay-ref"
+            type="text"
+            name="reference"
+            value={form.reference}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`form-control ${touched.reference && errors.reference ? 'is-invalid' : ''}`}
+            required
+          />
+          {touched.reference && errors.reference && (
+            <span className="form-error-msg"><AlertCircle size={13} /> {errors.reference}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label" htmlFor="pay-approved">
+          Authorized By (Supervisor / Finance) <span className="required">*</span>
+        </label>
+        <input
+          id="pay-approved"
+          type="text"
+          name="approvedBy"
+          value={form.approvedBy}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          className={`form-control ${touched.approvedBy && errors.approvedBy ? 'is-invalid' : ''}`}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label" htmlFor="pay-notes">Payment Remarks / Cycle Notes</label>
+        <textarea
+          id="pay-notes"
+          name="notes"
+          rows="2"
+          value={form.notes}
+          onChange={handleChange}
+          className="form-control"
+          placeholder="e.g. Bi-weekly settlement including 12 hours overtime bonus"
+        />
+      </div>
+
+      <div className="modal-footer" style={{ margin: '16px -24px -24px -24px' }}>
+        <button type="button" className="btn btn-outline" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="submit" className="btn btn-primary">
+          <DollarSign size={18} />
+          Finalize & Record Payment
+        </button>
+      </div>
+    </form>
+  );
+};
+
+const RecordPaymentWrapper = ({ laborer, onClose, onSuccessPayment }) => {
+  const { laborers, recordPayment, getCalculatedWages } = useLabor();
+  const [selectedLaborerId, setSelectedLaborerId] = useState(
+    () => laborer?.id || (laborers.length > 0 ? laborers[0].id : '')
+  );
+
+  const calculatedWages = getCalculatedWages();
+  const currentLaborerWage = calculatedWages.find((w) => w.laborer.id === selectedLaborerId);
+
+  return (
+    <div>
       {/* Worker Selection & Balance Card */}
       <div style={{ marginBottom: '20px', background: 'var(--bg-card-alt)', padding: '16px 20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
         <div className="form-group" style={{ marginBottom: '12px' }}>
@@ -172,141 +294,34 @@ const RecordPaymentModal = ({ isOpen, onClose, laborer, onSuccessPayment }) => {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="form-row">
-          <div className="form-group">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="form-label" htmlFor="pay-amount">
-                Payment Amount (Rs. LKR) <span className="required">*</span>
-              </label>
-              {currentLaborerWage && currentLaborerWage.balanceDue > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSetFullBalance}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--amber-primary)',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    textDecoration: 'underline'
-                  }}
-                >
-                  Pay Full Balance (Rs. {currentLaborerWage.balanceDue.toFixed(2)})
-                </button>
-              )}
-            </div>
-            <input
-              id="pay-amount"
-              type="number"
-              step="1.00"
-              min="1.00"
-              name="amount"
-              placeholder="0.00"
-              value={form.amount}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className={`form-control ${touched.amount && errors.amount ? 'is-invalid' : ''}`}
-              required
-            />
-            {touched.amount && errors.amount && (
-              <span className="form-error-msg"><AlertCircle size={13} /> {errors.amount}</span>
-            )}
-          </div>
+      <RecordPaymentForm
+        key={selectedLaborerId}
+        selectedLaborerId={selectedLaborerId}
+        currentLaborerWage={currentLaborerWage}
+        onClose={onClose}
+        recordPayment={recordPayment}
+        onSuccessPayment={onSuccessPayment}
+      />
+    </div>
+  );
+};
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="pay-date">
-              Disbursement Date <span className="required">*</span>
-            </label>
-            <input
-              id="pay-date"
-              type="date"
-              name="date"
-              value={form.date}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className={`form-control ${touched.date && errors.date ? 'is-invalid' : ''}`}
-              required
-            />
-          </div>
-        </div>
+const RecordPaymentModal = ({ isOpen, onClose, laborer, onSuccessPayment }) => {
+  if (!isOpen) return null;
 
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label" htmlFor="pay-method">Payment Method</label>
-            <select
-              id="pay-method"
-              name="method"
-              value={form.method}
-              onChange={handleChange}
-              className="form-control"
-            >
-              <option value="Bank Transfer">Bank Wire Transfer</option>
-              <option value="Cash">Cash Payroll Disbursement</option>
-              <option value="Cheque">Bank Cheque</option>
-              <option value="Digital Wallet">Mobile / Digital Wallet</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="pay-ref">
-              Transaction / Cheque Ref <span className="required">*</span>
-            </label>
-            <input
-              id="pay-ref"
-              type="text"
-              name="reference"
-              value={form.reference}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className={`form-control ${touched.reference && errors.reference ? 'is-invalid' : ''}`}
-              required
-            />
-            {touched.reference && errors.reference && (
-              <span className="form-error-msg"><AlertCircle size={13} /> {errors.reference}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label" htmlFor="pay-approved">
-            Authorized By (Supervisor / Finance) <span className="required">*</span>
-          </label>
-          <input
-            id="pay-approved"
-            type="text"
-            name="approvedBy"
-            value={form.approvedBy}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className={`form-control ${touched.approvedBy && errors.approvedBy ? 'is-invalid' : ''}`}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label" htmlFor="pay-notes">Payment Remarks / Cycle Notes</label>
-          <textarea
-            id="pay-notes"
-            name="notes"
-            rows="2"
-            value={form.notes}
-            onChange={handleChange}
-            className="form-control"
-            placeholder="e.g. Bi-weekly settlement including 12 hours overtime bonus"
-          />
-        </div>
-
-        <div className="modal-footer" style={{ margin: '16px -24px -24px -24px' }}>
-          <button type="button" className="btn btn-outline" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary">
-            <DollarSign size={18} />
-            Finalize & Record Payment
-          </button>
-        </div>
-      </form>
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Record Finalized Labor Payment"
+      maxWidth="680px"
+    >
+      <RecordPaymentWrapper
+        key={laborer?.id || 'default'}
+        laborer={laborer}
+        onClose={onClose}
+        onSuccessPayment={onSuccessPayment}
+      />
     </Modal>
   );
 };

@@ -1,29 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../common/Modal';
 import { useLabor } from '../../context/LaborContext';
-import { Users, CheckSquare, Square, Building2, HardHat } from 'lucide-react';
+import { CheckSquare, Square, HardHat } from 'lucide-react';
 
-const SiteAllocationModal = ({ isOpen, onClose, site }) => {
-  const { laborers, sites, allocateLaborersToSite } = useLabor();
-  const [selectedLaborerIds, setSelectedLaborerIds] = useState([]);
+const SiteAllocationContent = ({ site, onClose, laborers, sites, allocateLaborersToSite }) => {
+  const [selectedLaborerIds, setSelectedLaborerIds] = useState(() =>
+    laborers.filter((l) => l.assignedSiteId === site.id).map((l) => l.id)
+  );
   const [searchFilter, setSearchFilter] = useState('');
-
-  useEffect(() => {
-    if (site) {
-      const currentlyAllocated = laborers
-        .filter((l) => l.assignedSiteId === site.id)
-        .map((l) => l.id);
-      setSelectedLaborerIds(currentlyAllocated);
-    }
-  }, [site, laborers]);
-
-  if (!site) return null;
 
   const toggleLaborer = (id) => {
     setSelectedLaborerIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
+  const filteredLaborers = laborers.filter((l) =>
+    l.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    l.role.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    l.nic.toLowerCase().includes(searchFilter.toLowerCase())
+  );
 
   const handleSelectAll = () => {
     const allMatching = filteredLaborers.map((l) => l.id);
@@ -40,19 +36,8 @@ const SiteAllocationModal = ({ isOpen, onClose, site }) => {
     onClose();
   };
 
-  const filteredLaborers = laborers.filter((l) =>
-    l.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    l.role.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    l.nic.toLowerCase().includes(searchFilter.toLowerCase())
-  );
-
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Workforce Site Allocation — ${site.name}`}
-      maxWidth="720px"
-    >
+    <>
       <div style={{ marginBottom: '16px', background: 'var(--bg-card-alt)', padding: '14px 18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '0.78rem', color: 'var(--amber-primary)', fontFamily: 'var(--font-mono)' }}>{site.code}</div>
@@ -151,6 +136,30 @@ const SiteAllocationModal = ({ isOpen, onClose, site }) => {
           Save Allocation ({selectedLaborerIds.length} Workers)
         </button>
       </div>
+    </>
+  );
+};
+
+const SiteAllocationModal = ({ isOpen, onClose, site }) => {
+  const { laborers, sites, allocateLaborersToSite } = useLabor();
+
+  if (!isOpen || !site) return null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Workforce Site Allocation — ${site.name}`}
+      maxWidth="720px"
+    >
+      <SiteAllocationContent
+        key={site.id}
+        site={site}
+        onClose={onClose}
+        laborers={laborers}
+        sites={sites}
+        allocateLaborersToSite={allocateLaborersToSite}
+      />
     </Modal>
   );
 };

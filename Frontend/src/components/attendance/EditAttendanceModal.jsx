@@ -1,35 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Modal from '../common/Modal';
 import { useLabor } from '../../context/LaborContext';
-import { Save, AlertCircle, Clock } from 'lucide-react';
+import { Save, AlertCircle } from 'lucide-react';
 
-const EditAttendanceModal = ({ isOpen, onClose, record }) => {
-  const { laborers, sites, updateAttendanceRecord } = useLabor();
-
-  const [form, setForm] = useState({
-    status: 'Present',
-    regularHours: 8,
-    overtimeHours: 0,
-    otReason: '',
-    supervisorNotes: ''
-  });
+const EditAttendanceForm = ({ record, onClose, laborers, sites, updateAttendanceRecord }) => {
+  const [form, setForm] = useState(() => ({
+    status: record.status || 'Present',
+    regularHours: record.regularHours !== undefined ? String(record.regularHours) : '8',
+    overtimeHours: record.overtimeHours !== undefined ? String(record.overtimeHours) : '0',
+    otReason: record.otReason || '',
+    supervisorNotes: record.supervisorNotes || ''
+  }));
 
   const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    if (record) {
-      setForm({
-        status: record.status || 'Present',
-        regularHours: record.regularHours !== undefined ? String(record.regularHours) : '8',
-        overtimeHours: record.overtimeHours !== undefined ? String(record.overtimeHours) : '0',
-        otReason: record.otReason || '',
-        supervisorNotes: record.supervisorNotes || ''
-      });
-      setErrors({});
-    }
-  }, [record]);
-
-  if (!record) return null;
 
   const laborer = laborers.find((l) => l.id === record.laborerId);
   const site = sites.find((s) => s.id === record.siteId);
@@ -83,12 +66,7 @@ const EditAttendanceModal = ({ isOpen, onClose, record }) => {
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Correct Attendance Record"
-      maxWidth="620px"
-    >
+    <>
       <div style={{ marginBottom: '18px', background: 'var(--bg-card-alt)', padding: '14px 18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Laborer</div>
@@ -200,6 +178,30 @@ const EditAttendanceModal = ({ isOpen, onClose, record }) => {
           </button>
         </div>
       </form>
+    </>
+  );
+};
+
+const EditAttendanceModal = ({ isOpen, onClose, record }) => {
+  const { laborers, sites, updateAttendanceRecord } = useLabor();
+
+  if (!isOpen || !record) return null;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Correct Attendance Record"
+      maxWidth="620px"
+    >
+      <EditAttendanceForm
+        key={record.id}
+        record={record}
+        onClose={onClose}
+        laborers={laborers}
+        sites={sites}
+        updateAttendanceRecord={updateAttendanceRecord}
+      />
     </Modal>
   );
 };

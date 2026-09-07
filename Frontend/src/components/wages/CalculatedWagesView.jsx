@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useLabor } from '../../context/LaborContext';
 import {
   Receipt,
@@ -42,22 +42,20 @@ const CalculatedWagesView = () => {
   const totalOutstandingDue = calculatedWages.reduce((sum, w) => sum + w.balanceDue, 0);
 
   // Filtered wages
-  const filteredWages = useMemo(() => {
-    return calculatedWages.filter((w) => {
-      const matchesSearch =
-        w.laborer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        w.laborer.nic.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        w.laborer.role.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredWages = calculatedWages.filter((w) => {
+    const matchesSearch =
+      w.laborer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      w.laborer.nic.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      w.laborer.role.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesSite =
-        selectedSiteId === 'ALL' ||
-        (selectedSiteId === 'UNASSIGNED' ? !w.laborer.assignedSiteId : w.laborer.assignedSiteId === selectedSiteId);
+    const matchesSite =
+      selectedSiteId === 'ALL' ||
+      (selectedSiteId === 'UNASSIGNED' ? !w.laborer.assignedSiteId : w.laborer.assignedSiteId === selectedSiteId);
 
-      const matchesStatus = selectedStatus === 'ALL' || w.paymentStatus === selectedStatus;
+    const matchesStatus = selectedStatus === 'ALL' || w.paymentStatus === selectedStatus;
 
-      return matchesSearch && matchesSite && matchesStatus;
-    });
-  }, [calculatedWages, searchTerm, selectedSiteId, selectedStatus]);
+    return matchesSearch && matchesSite && matchesStatus;
+  });
 
   const handleOpenPayment = (laborer) => {
     setSelectedLaborerForPay(laborer);

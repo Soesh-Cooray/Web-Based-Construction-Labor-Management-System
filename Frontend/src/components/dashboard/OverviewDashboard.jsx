@@ -113,41 +113,47 @@ const OverviewDashboard = ({ onNavigate, onOpenAddLaborer, onOpenAddSite }) => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {sites.slice(0, 3).map((site) => {
-              const siteWorkers = laborers.filter((l) => l.assignedSiteId === site.id);
-              return (
-                <div
-                  key={site.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    background: 'var(--bg-card-alt)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#fff' }}>{site.name}</div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', marginTop: '2px' }}>
-                      <span style={{ color: 'var(--amber-primary)', fontFamily: 'var(--font-mono)' }}>{site.code}</span>
-                      <span>&bull;</span>
-                      <span>{site.location.split(',')[0]}</span>
+            {sites.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', textAlign: 'center', padding: '24px' }}>
+                No construction sites registered yet. Click &ldquo;New Project Site&rdquo; above to add one.
+              </p>
+            ) : (
+              sites.slice(0, 3).map((site) => {
+                const siteWorkers = laborers.filter((l) => l.assignedSiteId === site.id);
+                return (
+                  <div
+                    key={site.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      background: 'var(--bg-card-alt)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#fff' }}>{site.name}</div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', marginTop: '2px' }}>
+                        <span style={{ color: 'var(--amber-primary)', fontFamily: 'var(--font-mono)' }}>{site.code}</span>
+                        <span>&bull;</span>
+                        <span>{site.location ? site.location.split(',')[0] : 'No location specified'}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <span className="badge badge-amber">
-                      <Users size={12} /> {siteWorkers.length} Workers
-                    </span>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {site.manager.split(' ')[1] || site.manager}
+                    <div style={{ textAlign: 'right' }}>
+                      <span className="badge badge-amber">
+                        <Users size={12} /> {siteWorkers.length} Workers
+                      </span>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {site.manager ? (site.manager.split(' ')[1] || site.manager) : 'No manager'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 

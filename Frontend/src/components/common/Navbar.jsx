@@ -58,9 +58,9 @@ const Navbar = ({ activeTab, onOpenAddLaborer, onToggleSidebar }) => {
       </div>
 
       <div className="nav-right">
-        <div className="system-status-indicator" title="System synchronizing with local database">
+        <div className="system-status-indicator" title="Live connection to TiDB Cloud (JAL)">
           <div className="pulse-dot" />
-          <span>System Online</span>
+          <span>TiDB Cloud Connected</span>
         </div>
 
         <div className="date-clock-badge">

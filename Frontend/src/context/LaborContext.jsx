@@ -1,58 +1,26 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  INITIAL_LABORERS,
-  INITIAL_SITES,
-  INITIAL_ATTENDANCE,
-  INITIAL_PAYMENTS
-} from '../utils/mockData';
+  laborersApi,
+  sitesApi,
+  attendanceApi,
+  paymentsApi
+} from '../services/api';
 
 const LaborContext = createContext();
 
 export const LaborProvider = ({ children }) => {
-  // 1. Laborers state
-  const [laborers, setLaborers] = useState(() => {
-    const saved = localStorage.getItem('buildforce_laborers_lkr');
-    return saved ? JSON.parse(saved) : INITIAL_LABORERS;
-  });
+  // Live state connected to TiDB Cloud
+  const [laborers, setLaborers] = useState([]);
+  const [sites, setSites] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [payments, setPayments] = useState([]);
 
-  // 2. Sites state
-  const [sites, setSites] = useState(() => {
-    const saved = localStorage.getItem('buildforce_sites_lkr');
-    return saved ? JSON.parse(saved) : INITIAL_SITES;
-  });
-
-  // 3. Attendance state
-  const [attendance, setAttendance] = useState(() => {
-    const saved = localStorage.getItem('buildforce_attendance_lkr');
-    return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE;
-  });
-
-  // 4. Payments state
-  const [payments, setPayments] = useState(() => {
-    const saved = localStorage.getItem('buildforce_payments_lkr');
-    return saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   // Toasts
   const [toasts, setToasts] = useState([]);
-
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem('buildforce_laborers_lkr', JSON.stringify(laborers));
-  }, [laborers]);
-
-  useEffect(() => {
-    localStorage.setItem('buildforce_sites_lkr', JSON.stringify(sites));
-  }, [sites]);
-
-  useEffect(() => {
-    localStorage.setItem('buildforce_attendance_lkr', JSON.stringify(attendance));
-  }, [attendance]);
-
-  useEffect(() => {
-    localStorage.setItem('buildforce_payments_lkr', JSON.stringify(payments));
-  }, [payments]);
 
   // Toast dispatch
   const showToast = (message, type = 'success') => {
@@ -67,151 +35,220 @@ export const LaborProvider = ({ children }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // --- Laborer Actions ---
-  const addLaborer = (laborerData) => {
-    const newId = `LAB-${Math.floor(100 + Math.random() * 900)}`;
-    const newLaborer = {
-      id: newId,
-      status: 'Active',
-      joinDate: new Date().toISOString().split('T')[0],
-      ...laborerData,
-      hourlyRate: parseFloat(laborerData.hourlyRate) || 12.00
+  // Manual refresh handler
+  const refreshAllData = async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const [labs, stes, atts, pays] = await Promise.all([
+        laborersApi.getAll(),
+        sitesApi.getAll(),
+        attendanceApi.getAll(),
+        paymentsApi.getAll()
+      ]);
+      setLaborers(labs);
+      setSites(stes);
+      setAttendance(atts);
+      setPayments(pays);
+    } catch (err) {
+      console.error('Failed to load data from database:', err);
+      setFetchError(err.message);
+      showToast(`Database: ${err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial load on mount
+  useEffect(() => {
+    let ignore = false;
+
+    Promise.all([
+      laborersApi.getAll(),
+      sitesApi.getAll(),
+      attendanceApi.getAll(),
+      paymentsApi.getAll()
+    ])
+      .then(([labs, stes, atts, pays]) => {
+        if (!ignore) {
+          setLaborers(labs);
+          setSites(stes);
+          setAttendance(atts);
+          setPayments(pays);
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          console.error('Failed to load data from database:', err);
+          setFetchError(err.message);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
     };
-    setLaborers((prev) => [newLaborer, ...prev]);
-    showToast(`Laborer "${newLaborer.name}" successfully registered as ${newLaborer.role}.`);
-    return newLaborer;
+  }, []);
+
+  // --- Laborer Actions ---
+  const addLaborer = async (laborerData) => {
+    try {
+      const created = await laborersApi.create(laborerData);
+      setLaborers((prev) => [created, ...prev]);
+      showToast(`Laborer "${created.name}" registered successfully.`);
+      return created;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
-  const updateLaborer = (id, updatedFields) => {
-    setLaborers((prev) =>
-      prev.map((lab) =>
-        lab.id === id
-          ? {
-              ...lab,
-              ...updatedFields,
-              hourlyRate: parseFloat(updatedFields.hourlyRate !== undefined ? updatedFields.hourlyRate : lab.hourlyRate)
-            }
-          : lab
-      )
-    );
-    showToast(`Laborer profile updated successfully.`);
+  const updateLaborer = async (id, updatedFields) => {
+    try {
+      const updated = await laborersApi.update(id, updatedFields);
+      setLaborers((prev) => prev.map((lab) => (lab.id === id ? updated : lab)));
+      showToast(`Laborer profile updated successfully.`);
+      return updated;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
-  const deleteLaborer = (id) => {
-    const lab = laborers.find((l) => l.id === id);
-    setLaborers((prev) => prev.filter((l) => l.id !== id));
-    showToast(`Laborer ${lab ? lab.name : id} removed from directory.`, 'info');
+  const deleteLaborer = async (id) => {
+    try {
+      await laborersApi.delete(id);
+      setLaborers((prev) => prev.filter((l) => l.id !== id));
+      setAttendance((prev) => prev.filter((a) => a.laborerId !== id));
+      setPayments((prev) => prev.filter((p) => p.laborerId !== id));
+      showToast(`Laborer removed from directory.`, 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
   // --- Site Actions ---
-  const addSite = (siteData) => {
-    const newId = `SITE-${String(sites.length + 1).padStart(2, '0')}`;
-    const newSite = {
-      id: newId,
-      status: siteData.status || 'Active',
-      ...siteData,
-      budget: parseFloat(siteData.budget) || 0
-    };
-    setSites((prev) => [newSite, ...prev]);
-    showToast(`Construction site "${newSite.name}" registered successfully.`);
-    return newSite;
+  const addSite = async (siteData) => {
+    try {
+      const created = await sitesApi.create(siteData);
+      setSites((prev) => [created, ...prev]);
+      showToast(`Construction site "${created.name}" registered successfully.`);
+      return created;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
-  const updateSite = (id, updatedFields) => {
-    setSites((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? {
-              ...s,
-              ...updatedFields,
-              budget: parseFloat(updatedFields.budget !== undefined ? updatedFields.budget : s.budget)
-            }
-          : s
-      )
-    );
-    showToast(`Site project details updated.`);
+  const updateSite = async (id, updatedFields) => {
+    try {
+      const updated = await sitesApi.update(id, updatedFields);
+      setSites((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      showToast(`Site project details updated.`);
+      return updated;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
-  const deleteSite = (id) => {
-    setSites((prev) => prev.filter((s) => s.id !== id));
-    showToast(`Project site record deleted.`, 'info');
+  const deleteSite = async (id) => {
+    try {
+      await sitesApi.delete(id);
+      setSites((prev) => prev.filter((s) => s.id !== id));
+      setLaborers((prev) =>
+        prev.map((l) => (l.assignedSiteId === id ? { ...l, assignedSiteId: null } : l))
+      );
+      showToast(`Project site record deleted.`, 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
-  const allocateLaborersToSite = (siteId, laborerIds) => {
-    setLaborers((prev) =>
-      prev.map((lab) => {
-        if (laborerIds.includes(lab.id)) {
-          return { ...lab, assignedSiteId: siteId };
-        } else if (lab.assignedSiteId === siteId) {
-          // Unassigned
-          return { ...lab, assignedSiteId: '' };
-        }
-        return lab;
-      })
-    );
-    showToast(`Site workforce allocation updated.`);
+  const allocateLaborersToSite = async (siteId, laborerIds) => {
+    try {
+      const res = await sitesApi.allocate(siteId, laborerIds);
+      if (res.laborers) {
+        setLaborers(res.laborers);
+      } else {
+        setLaborers((prev) =>
+          prev.map((lab) => {
+            if (laborerIds.includes(lab.id)) return { ...lab, assignedSiteId: siteId };
+            if (lab.assignedSiteId === siteId) return { ...lab, assignedSiteId: null };
+            return lab;
+          })
+        );
+      }
+      showToast(`Site workforce allocation updated.`);
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
   // --- Attendance Actions ---
-  const recordAttendance = (records) => {
-    const recordList = Array.isArray(records) ? records : [records];
-    setAttendance((prev) => {
-      // Replace existing records for same laborer and date, otherwise append
-      let updated = [...prev];
-      recordList.forEach((rec) => {
-        const index = updated.findIndex(
-          (item) => item.laborerId === rec.laborerId && item.date === rec.date
-        );
-        const recordWithId = {
-          ...rec,
-          id: rec.id || `ATT-${rec.date.replace(/-/g, '')}-${rec.laborerId.replace('LAB-', '')}`,
-          regularHours: parseFloat(rec.regularHours) || 0,
-          overtimeHours: parseFloat(rec.overtimeHours) || 0
-        };
-        if (index >= 0) {
-          updated[index] = recordWithId;
-        } else {
-          updated.unshift(recordWithId);
-        }
+  const recordAttendance = async (records) => {
+    try {
+      const savedList = await attendanceApi.record(records);
+      setAttendance((prev) => {
+        let updated = [...prev];
+        savedList.forEach((rec) => {
+          const index = updated.findIndex(
+            (item) => item.laborerId === rec.laborerId && item.date === rec.date
+          );
+          if (index >= 0) {
+            updated[index] = rec;
+          } else {
+            updated.unshift(rec);
+          }
+        });
+        return updated;
       });
+      showToast(`Daily attendance saved for ${savedList.length} worker(s).`);
+      return savedList;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
+  };
+
+  const updateAttendanceRecord = async (id, updatedFields) => {
+    try {
+      const updated = await attendanceApi.update(id, updatedFields);
+      setAttendance((prev) => prev.map((rec) => (rec.id === id ? updated : rec)));
+      showToast(`Attendance record updated.`);
       return updated;
-    });
-    showToast(`Daily attendance saved for ${recordList.length} worker(s).`);
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
-  const updateAttendanceRecord = (id, updatedFields) => {
-    setAttendance((prev) =>
-      prev.map((rec) =>
-        rec.id === id
-          ? {
-              ...rec,
-              ...updatedFields,
-              regularHours: parseFloat(updatedFields.regularHours !== undefined ? updatedFields.regularHours : rec.regularHours),
-              overtimeHours: parseFloat(updatedFields.overtimeHours !== undefined ? updatedFields.overtimeHours : rec.overtimeHours)
-            }
-          : rec
-      )
-    );
-    showToast(`Attendance record updated.`);
-  };
-
-  const deleteAttendanceRecord = (id) => {
-    setAttendance((prev) => prev.filter((rec) => rec.id !== id));
-    showToast(`Attendance record removed.`, 'info');
+  const deleteAttendanceRecord = async (id) => {
+    try {
+      await attendanceApi.delete(id);
+      setAttendance((prev) => prev.filter((rec) => rec.id !== id));
+      showToast(`Attendance record removed.`, 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
   // --- Payment Actions ---
-  const recordPayment = (paymentData) => {
-    const newId = `PAY-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newPayment = {
-      id: newId,
-      ...paymentData,
-      amount: parseFloat(paymentData.amount) || 0,
-      date: paymentData.date || new Date().toISOString().split('T')[0]
-    };
-    setPayments((prev) => [newPayment, ...prev]);
-    showToast(`Payment of Rs. ${newPayment.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded successfully.`);
-    return newPayment;
+  const recordPayment = async (paymentData) => {
+    try {
+      const created = await paymentsApi.record(paymentData);
+      setPayments((prev) => [created, ...prev]);
+      showToast(`Payment of Rs. ${created.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded successfully.`);
+      return created;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
   };
 
   // Helper to compute calculated wages per laborer
@@ -227,11 +264,11 @@ export const LaborProvider = ({ children }) => {
         return true;
       });
 
-      const totalRegularHours = laborerAttendance.reduce((acc, rec) => acc + (rec.regularHours || 0), 0);
-      const totalOvertimeHours = laborerAttendance.reduce((acc, rec) => acc + (rec.overtimeHours || 0), 0);
+      const totalRegularHours = laborerAttendance.reduce((acc, rec) => acc + (parseFloat(rec.regularHours) || 0), 0);
+      const totalOvertimeHours = laborerAttendance.reduce((acc, rec) => acc + (parseFloat(rec.overtimeHours) || 0), 0);
       const daysWorked = laborerAttendance.filter((rec) => rec.status === 'Present' || rec.status === 'Half-Day').length;
 
-      const hourlyRate = laborer.hourlyRate || 1200.00;
+      const hourlyRate = parseFloat(laborer.hourlyRate) || 1200.00;
       const overtimeRate = hourlyRate * 1.5; // Standard 1.5x OT multiplier
 
       const regularWages = totalRegularHours * hourlyRate;
@@ -240,7 +277,7 @@ export const LaborProvider = ({ children }) => {
 
       // Filter laborer's payments
       const laborerPayments = payments.filter((p) => p.laborerId === laborer.id);
-      const totalPaid = laborerPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+      const totalPaid = laborerPayments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
       const balanceDue = Math.max(0, grossWages - totalPaid);
 
       let paymentStatus = 'Pending';
@@ -271,23 +308,6 @@ export const LaborProvider = ({ children }) => {
     });
   };
 
-  // Reset to demo data
-  const resetDemoData = () => {
-    setLaborers(INITIAL_LABORERS);
-    setSites(INITIAL_SITES);
-    setAttendance(INITIAL_ATTENDANCE);
-    setPayments(INITIAL_PAYMENTS);
-    localStorage.removeItem('buildforce_laborers_lkr');
-    localStorage.removeItem('buildforce_sites_lkr');
-    localStorage.removeItem('buildforce_attendance_lkr');
-    localStorage.removeItem('buildforce_payments_lkr');
-    localStorage.removeItem('buildforce_laborers');
-    localStorage.removeItem('buildforce_sites');
-    localStorage.removeItem('buildforce_attendance');
-    localStorage.removeItem('buildforce_payments');
-    showToast('Demo data restored to default state (Rs. LKR).', 'info');
-  };
-
   return (
     <LaborContext.Provider
       value={{
@@ -296,6 +316,9 @@ export const LaborProvider = ({ children }) => {
         attendance,
         payments,
         toasts,
+        isLoading,
+        fetchError,
+        refreshAllData,
         showToast,
         removeToast,
         addLaborer,
@@ -309,8 +332,7 @@ export const LaborProvider = ({ children }) => {
         updateAttendanceRecord,
         deleteAttendanceRecord,
         recordPayment,
-        getCalculatedWages,
-        resetDemoData
+        getCalculatedWages
       }}
     >
       {children}

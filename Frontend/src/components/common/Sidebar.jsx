@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -6,12 +5,12 @@ import {
   CalendarCheck,
   Receipt,
   HardHat,
-  RotateCcw
+  RefreshCw
 } from 'lucide-react';
 import { useLabor } from '../../context/LaborContext';
 
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
-  const { laborers, sites, resetDemoData } = useLabor();
+  const { laborers, sites, refreshAllData, isLoading } = useLabor();
 
   const navItems = [
     {
@@ -93,15 +92,16 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
             </button>
           ))}
 
-          <div className="nav-section-title" style={{ marginTop: '16px' }}>System</div>
+          <div className="nav-section-title" style={{ marginTop: '16px' }}>Database</div>
           <button
             className="nav-item"
-            onClick={resetDemoData}
-            title="Reset system to initial mock demo dataset"
+            onClick={refreshAllData}
+            title="Sync live records from TiDB Cloud database"
+            disabled={isLoading}
           >
             <div className="nav-item-content">
-              <RotateCcw size={17} />
-              <span style={{ fontSize: '0.85rem' }}>Reset Demo Data</span>
+              <RefreshCw size={17} className={isLoading ? 'spin-icon' : ''} />
+              <span style={{ fontSize: '0.85rem' }}>{isLoading ? 'Syncing TiDB...' : 'Sync Cloud DB'}</span>
             </div>
           </button>
         </nav>
